@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <title>Formular de colectare a datelor medicale pentru menopauză</title>
+</head>
+<body>
+
+<h1>Formular de colectare a datelor medicale pentru menopauză</h1>
+
+<form action="generare-raport.php" method="post">
+
+  <div class="informatie-generala">
+    <h2>Informații generale</h2>
+    <div class="nume-pacient">
+      <label for="nume-pacient">Nume pacient:</label>
+      <input type="text" name="nume-pacient" id="nume-pacient" required>
+    </div>
+    <div class="data-nasterii">
+      <label for="data-nasterii">Data nașterii:</label>
+      <input type="date" name="data-nasterii" id="data-nasterii" required>
+    </div>
+    <div class="data-consultului">
+      <label for="data-consultului">Data consultului:</label>
+      <input type="date" name="data-consultului" id="data-consultului" required>
+    </div>
+    <div class="medic">
+      <label for="medic">Medic:</label>
+      <input type="text" name="medic" id="medic" required>
+    </div>
+  </div>
+
+  <div class="motiv-vizitei">
+    <h2>Motivul vizitei</h2>
+    <div class="simptome-menopauza">
+      <label for="simptome-menopauza">Simptome de menopauză:</label>
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="menstruații neregulate"> Menstruații neregulate
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="bufeuri"> Bufeuri
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="transpirații nocturne"> Transpirații nocturne
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="tulburări de somn"> Tulburări de somn
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="tulburări de dispoziție"> Tulburări de dispoziție
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="modificări ale libidoului"> Modificări ale libidoului
+      <input type="checkbox" name="simptome-menopauza" id="simptome-menopauza" value="alte simptome"> Alte simptome:
+      <input type="text" name="alte-simptome" id="alte-simptome">
+    </div>
+    <div class="alte-motive">
+      <label for="alte-motive">Alte motive pentru vizită:</label>
+      <textarea name="alte-motive" id="alte-motive"></textarea>
+    </div>
+  </div>
+
+  <div class="istoric-medical">
+    <h2>Istoric medical</h2>
+    <div class="menstruatii">
+      <label for="menstruatii">Menstruații:</label>
+      <div class="varsta-primei-menstruatii">
+        <label for="varsta-primei-menstruatii">Vârsta primei menstruații:</label>
+        <input type="number" name="varsta-primei-menstruatii" id="varsta-primei-menstruatii" min="10" max="50" required>
+      </div>
+      <div class="durata-ciclului-menstrual">
+        <label for="durata-ciclului-menstrual">Durata ciclului menstrual:</label>
+        <input type="number" name="durata-ciclului-menstrual" id="durata
