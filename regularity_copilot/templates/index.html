@@ -1,0 +1,182 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Regularity Copilot</title>
+	<style>
+		body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;padding:16px;background:#0b0b10;color:#e7e7ea}
+		.container{max-width:1100px;margin:0 auto}
+		h1{font-size:24px;margin:0 0 8px}
+		section{background:#12121a;border:1px solid #232332;border-radius:12px;padding:16px;margin-bottom:16px}
+		label{display:block;margin:8px 0 4px}
+		input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #2a2a3b;background:#0f0f16;color:#fff}
+		button{background:#3b82f6;border:0;border-radius:10px;padding:10px 14px;color:#fff;cursor:pointer}
+		button:disabled{opacity:.6}
+		.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+		.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+		.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#1d1d2b;border:1px solid #2a2a3b}
+		.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+		.kpi div{background:#0f0f16;border:1px solid #2a2a3b;border-radius:10px;padding:12px}
+		.small{opacity:.8;font-size:12px}
+		.table{width:100%;border-collapse:collapse}
+		.table th,.table td{border-bottom:1px solid #222336;padding:8px;text-align:left}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h1>Regularity Copilot <span class="badge mono">beta</span></h1>
+		<section>
+			<div class="grid">
+				<div>
+					<h3>Configurare</h3>
+					<label>Start (ms epoch)</label>
+					<input id="start_ts" type="number" class="mono" placeholder="e.g. Date.now()" />
+					<label>Factor ODO (calibrare)</label>
+					<input id="odo_factor" type="number" step="0.0001" value="1.0" />
+					<label>Orizont corecție (km)</label>
+					<input id="horizon_km" type="number" step="0.1" value="1.0" />
+					<label>Segmente (JSON)</label>
+					<textarea id="segments_json" rows="8" class="mono">[
+	{"name":"S1","distance_km":5.0,"speed_kmh":48.0},
+	{"name":"S2","distance_km":7.2,"speed_kmh":52.0},
+	{"name":"S3","distance_km":3.8,"speed_kmh":45.0}
+]</textarea>
+					<div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+						<button id="btn_now">Setează start la acum</button>
+						<button id="btn_apply">Aplică configurarea</button>
+					</div>
+				</div>
+				<div>
+					<h3>Live</h3>
+					<label>ODO (km)</label>
+					<input id="odo_km" type="number" step="0.001" value="0.000" />
+					<div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+						<button id="btn_poll">Actualizează o dată</button>
+						<button id="btn_auto">Auto (1 Hz)</button>
+					</div>
+					<div style="margin-top:12px" class="kpi">
+						<div>
+							<div class="small">Delta timp</div>
+							<div id="k_delta" class="mono" style="font-size:20px">-</div>
+						</div>
+						<div>
+							<div class="small">Viteză segment (ideal)</div>
+							<div id="k_vs" class="mono" style="font-size:20px">-</div>
+						</div>
+						<div>
+							<div class="small">Orizont corecție</div>
+							<div id="k_hz" class="mono" style="font-size:20px">-</div>
+						</div>
+						<div>
+							<div class="small">Viteză recomandată</div>
+							<div id="k_vr" class="mono" style="font-size:24px;font-weight:700">-</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section>
+			<h3>Segmente curente</h3>
+			<table class="table" id="tbl_segments">
+				<thead>
+					<tr><th>#</th><th>Nume</th><th>Distanță (km)</th><th>Viteză (km/h)</th></tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</section>
+
+		<section>
+			<h3>Status</h3>
+			<pre id="status" class="mono" style="white-space:pre-wrap;background:#0f0f16;border:1px solid #2a2a3b;border-radius:10px;padding:10px">-</pre>
+		</section>
+	</div>
+
+	<script>
+		const state = JSON.parse(JSON.stringify({{ state|tojson }}));
+		const startTs = document.getElementById('start_ts');
+		const odoFactor = document.getElementById('odo_factor');
+		const horizonKm = document.getElementById('horizon_km');
+		const segmentsJson = document.getElementById('segments_json');
+		const tblBody = document.querySelector('#tbl_segments tbody');
+		const kDelta = document.getElementById('k_delta');
+		const kVs = document.getElementById('k_vs');
+		const kHz = document.getElementById('k_hz');
+		const kVr = document.getElementById('k_vr');
+		const statusEl = document.getElementById('status');
+		const odoKm = document.getElementById('odo_km');
+
+		function renderTable(segments){
+			tblBody.innerHTML = '';
+			segments.forEach((s, i) => {
+				const tr = document.createElement('tr');
+				tr.innerHTML = `<td>${i+1}</td><td>${s.name}</td><td>${s.distance_km.toFixed(3)}</td><td>${s.speed_kmh.toFixed(1)}</td>`;
+				tblBody.appendChild(tr);
+			});
+		}
+
+		function loadInitial(){
+			startTs.value = state.start_timestamp_ms || '';
+			odoFactor.value = state.odo_factor;
+			horizonKm.value = state.correction_horizon_km;
+			renderTable(state.segments || []);
+		}
+
+		document.getElementById('btn_now').addEventListener('click', ()=>{
+			startTs.value = Date.now();
+		});
+
+		document.getElementById('btn_apply').addEventListener('click', async ()=>{
+			let segments;
+			try{
+				segments = JSON.parse(segmentsJson.value || '[]');
+			}catch(e){
+				alert('JSON segmente invalid');
+				return;
+			}
+			const payload = {
+				start_timestamp_ms: startTs.value ? Number(startTs.value) : null,
+				segments,
+				odo_factor: Number(odoFactor.value || 1.0),
+				correction_horizon_km: Number(horizonKm.value || 1.0)
+			};
+			const res = await fetch('/configure', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+			const j = await res.json();
+			statusEl.textContent = JSON.stringify(j, null, 2);
+			if(j.ok){
+				Object.assign(state, j.state);
+				renderTable(state.segments || []);
+			}else{
+				alert('Eroare configurare');
+			}
+		});
+
+		let autoTimer = null;
+		document.getElementById('btn_auto').addEventListener('click', ()=>{
+			if(autoTimer){
+				clearInterval(autoTimer); autoTimer = null; return;
+			}
+			autoTimer = setInterval(pollOnce, 1000);
+		});
+
+		document.getElementById('btn_poll').addEventListener('click', pollOnce);
+
+		async function pollOnce(){
+			const nowMs = Date.now();
+			const params = new URLSearchParams({now_ms: String(nowMs), odo_km: String(Number(odoKm.value || 0))});
+			const res = await fetch('/api/status?' + params.toString());
+			const j = await res.json();
+			statusEl.textContent = JSON.stringify(j, null, 2);
+			if(j.ok){
+				kDelta.textContent = (j.delta_seconds > 0 ? '+' : '') + j.delta_seconds.toFixed(2) + ' s';
+				kVs.textContent = j.ideal_segment_speed_kmh.toFixed(1) + ' km/h';
+				kHz.textContent = j.correction_horizon_km.toFixed(2) + ' km';
+				kVr.textContent = j.recommended_speed_kmh.toFixed(1) + ' km/h';
+			}
+		}
+
+		loadInitial();
+	</script>
+</body>
+</html>
